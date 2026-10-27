@@ -1,47 +1,9 @@
 # 🐳 Docker Zero to Hero: Complete Guide & Practice
 
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/)
 
 > **Welcome to Docker Practice!** 🚀  
 > This repository is a comprehensive, beginner-friendly, and practical guide designed to help you master Docker from fundamentals to production-ready workflows. If you find this guide useful, don't forget to **⭐ Star** this repository!
 
----
-
-## 📑 Table of Contents
-
-- [1. What is a Container?](#1-what-is-a-container)
-  - [The Real-World Analogy](#the-real-world-analogy)
-  - [Technical Definition](#technical-definition)
-- [2. Containers vs. Virtual Machines (VMs)](#2-containers-vs-virtual-machines-vms)
-  - [Architecture Comparison](#architecture-comparison)
-  - [Comparison Matrix](#comparison-matrix)
-  - [Why Are Containers So Lightweight?](#why-are-containers-so-lightweight)
-  - [Linux Primitives Powering Containers](#linux-primitives-powering-containers)
-- [3. Why is Docker Useful?](#3-why-is-docker-useful)
-- [4. Docker Architecture & Core Components](#4-docker-architecture--core-components)
-  - [Architecture Diagram](#architecture-diagram)
-  - [Core Components Breakdown](#core-components-breakdown)
-- [5. How Docker Works: The Lifecycle](#5-how-docker-works-the-lifecycle)
-  - [Lifecycle Workflow](#lifecycle-workflow)
-  - [How Image Layers and Copy-on-Write Work](#how-image-layers-and-copy-on-write-work)
-- [6. Installation & Post-Install Setup](#6-installation--post-install-setup)
-  - [Linux (Ubuntu / Debian)](#linux-ubuntu--debian)
-  - [macOS & Windows](#macos--windows)
-  - [Critical Post-Install: Fixing Permission Denied](#critical-post-install-fixing-permission-denied)
-- [7. Hands-on Tutorial: From Zero to Running App](#7-hands-on-tutorial-from-zero-to-running-app)
-  - [Step 1: Verify Installation](#step-1-verify-installation)
-  - [Step 2: Understand the Dockerfile](#step-2-understand-the-dockerfile)
-  - [Step 3: Build Your Docker Image](#step-3-build-your-docker-image)
-  - [Step 4: Run Your Container](#step-4-run-your-container)
-  - [Step 5: Inspect and Debug](#step-5-inspect-and-debug)
-  - [Step 6: Push to Docker Hub](#step-6-push-to-docker-hub)
-- [8. Essential Docker Commands Cheat Sheet](#8-essential-docker-commands-cheat-sheet)
-- [9. Docker Best Practices](#9-docker-best-practices)
-- [10. Contributing & Community](#10-contributing--community)
-
----
 
 ## 1. What is a Container?
 
