@@ -381,47 +381,6 @@ flowchart TD
 
 ---
 
-### 11. Docker Desktop on macOS
-
-#### Why Docker Cannot Run Natively on macOS
-Containers are **not** an abstract technology; they rely on specific **Linux kernel system calls** (Namespaces, cgroups, OverlayFS, netfilter).  
-macOS runs the **XNU / Darwin kernel**. The macOS kernel does not have Linux namespaces or cgroups. Therefore:
-
-> **You cannot run native Linux containers directly on the macOS kernel.**
-
-#### How Docker Desktop Solves This:
-Docker Desktop on macOS runs a **custom, ultra-lightweight Linux Virtual Machine** behind the scenes (powered by Apple's native Virtualization Framework or HyperKit).
-
-```mermaid
-flowchart TD
-    subgraph MacHost["macOS Host (Apple Silicon / Intel)"]
-        MacCLI["Docker CLI (macOS binary)"]
-        Browser["Host Web Browser (http://localhost:8081)"]
-        Proxy["Docker Desktop Host Port Forwarder & Socket Proxy"]
-        
-        subgraph LinuxVM["Lightweight Linux VM (Alpine / LinuxKit)"]
-            DockerdVM["Docker Daemon (dockerd)"]
-            ContainerdVM["containerd + runc"]
-            Bridge["docker0 Bridge"]
-            ContProcess["Container: day1-web (Nginx PID)"]
-        end
-    end
-
-    MacCLI -->|"macOS Unix Socket (/var/run/docker.sock) forwarded to VM"| DockerdVM
-    DockerdVM --> ContainerdVM --> ContProcess
-    Browser -->|"http://localhost:8081"| Proxy
-    Proxy -->|"Network Tunnel into VM"| Bridge
-    Bridge -->|"Port 80"| ContProcess
-```
-
-#### Key Architectural Details on macOS:
-1. **The CLI is macOS Native**: When you type `docker` in Terminal, that executable is a macOS Mach-O binary.
-2. **The Socket is Proxied**: `/var/run/docker.sock` on macOS is a socket forwarder that routes API calls directly into the Linux VM's Docker daemon.
-3. **File Sharing (VirtioFS)**: When you bind-mount a macOS directory (`-v ~/code:/app`), Docker Desktop uses high-performance VirtioFS to synchronize files between macOS and the Linux VM.
-4. **Networking Tunneling**: Container IP addresses (`172.17.0.2`) are private to the Linux VM and cannot be pinged directly from your Mac terminal. However, published ports (`-p 8081:80`) are transparently forwarded to `localhost:8081` on your Mac.
-
----
-
 ## 3. How Docker Works: End-to-End Workflow
 
 Let us trace exactly what happens under the hood when a developer writes code and runs a container:
@@ -535,60 +494,8 @@ Here is a reference table categorizing Docker commands by the architectural comp
 
 ---
 
-## 6. Practical Architecture Example: Mac to Running Web App
 
-Let us trace our Day 1 practice application through every single architectural component on a Mac:
-
-```bash
-docker run -d --name day1-web -p 8081:80 nginx:alpine
-```
-
-```mermaid
-flowchart TD
-    subgraph Step1["1. Command Invocation"]
-        A["Developer types command in macOS Terminal"]
-    end
-
-    subgraph Step2["2. Client API Call"]
-        B["macOS Docker CLI translates command into POST /containers/create"]
-        C["API Call sent through /var/run/docker.sock proxy"]
-    end
-
-    subgraph Step3["3. Linux Virtual Machine (Docker Desktop)"]
-        D["dockerd inside LinuxKit VM receives request"]
-        E["dockerd instructs containerd to prepare rootfs"]
-        F["containerd invokes runc"]
-    end
-
-    subgraph Step4["4. Kernel Namespaces & cgroups"]
-        G["runc configures PID, NET, MNT namespaces and cgroup quotas"]
-        H["Nginx launched as PID 1 inside container"]
-    end
-
-    subgraph Step5["5. Networking & Traffic Flow"]
-        I["Host iptables directs host:8081 -> docker0 -> container:80"]
-        J["Browser at http://localhost:8081 receives Nginx welcome page"]
-    end
-
-    A --> B --> C --> D --> E --> F --> G --> H --> I --> J
-```
-
-### Component-by-Component Trace:
-1. **Docker CLI**: Reads `--name day1-web`, `-d`, `-p 8081:80`, and `nginx:alpine`. Formats JSON payload.
-2. **Docker Socket Proxy**: Transmits HTTP request across the hypervisor boundary into the Docker Desktop Linux VM.
-3. **Docker Daemon (`dockerd`)**: Verifies `nginx:alpine` exists in local layer store.
-4. **`containerd`**: Allocates an OverlayFS snapshot for the thin writable layer.
-5. **`runc`**: Assembles Linux namespaces:
-   - Sets container hostname to container ID.
-   - Sets container root to the mounted OverlayFS directory.
-   - Creates a virtual Ethernet interface (`eth0`) with IP `172.17.0.2`.
-   - Starts `/docker-entrypoint.sh nginx -g "daemon off;"`.
-6. **Docker Desktop Proxy**: Binds `localhost:8081` on the macOS host and tunnels TCP connections into the VM's bridge.
-7. **Developer Browser**: Requests `http://localhost:8081`. macOS delivers packet to proxy $\rightarrow$ VM $\rightarrow$ container $\rightarrow$ Nginx replies with HTML.
-
----
-
-## 7. Architecture Troubleshooting & Security Best Practices
+## 6. Architecture Troubleshooting & Security Best Practices
 
 ### 1. Docker Daemon Unavailable
 ```text
@@ -630,35 +537,8 @@ permission denied while trying to connect to the Docker daemon socket at unix://
   newgrp docker
   ```
 
-### 4. Unsafe Exposure of Docker Daemon API
-> [!CAUTION]
-> If you expose the Docker daemon over TCP without mutual TLS authentication (`dockerd -H tcp://0.0.0.0:2375`), automated internet scanners can locate your host within minutes, spin up cryptocurrency mining containers, and gain full root control over your host operating system.
-> 
-> **Production Rule:** Always protect remote Docker connections with TLS client certificates on port `2376`, or tunnel through SSH:
-> ```bash
-> export DOCKER_HOST="ssh://user@remote-server"
-> docker ps
-> ```
-
 ---
 
-## 8. Summary, Interview Questions & Architecture Checklist
-
-### Summary of Docker Components
-
-| Component | Responsibility | Technical Nature |
-| :--- | :--- | :--- |
-| **Docker Client** | Accepts user commands, converts them to REST calls. | Command-line CLI binary (`docker`) |
-| **Docker Daemon** | High-level orchestration, coordinates images, networks, volumes. | Long-running background daemon (`dockerd`) |
-| **REST API** | Standardized interface connecting Client to Daemon. | HTTP API over Unix Socket or TCP |
-| **`containerd`** | Supervises container process lifecycles and image snapshots. | CNCF runtime daemon |
-| **`runc`** | Interacts directly with Linux kernel to spawn container. | OCI-compliant low-level runtime |
-| **Namespaces** | Provides process, network, and filesystem boundaries. | Linux Kernel feature |
-| **Control Groups** | Restricts CPU, Memory, Disk I/O quotas. | Linux Kernel feature |
-| **OverlayFS** | Stacks read-only image layers under a thin writable layer. | Linux Union Filesystem |
-| **Registry** | Stores and distributes versioned container images. | Centralized cloud/on-prem service |
-
----
 
 ### Top Architecture Interview Questions & Answers
 
@@ -685,16 +565,3 @@ The Docker socket provides full access to the Docker daemon REST API. Because th
 A **Docker Layer** is an immutable set of filesystem modifications created by a build instruction (such as `RUN` or `COPY`). A **Docker Image** is an ordered stack of these read-only layers accompanied by a configuration manifest that specifies the execution entrypoint, default environment variables, architecture, and user settings.
 
 ---
-
-### Day 1 Architecture Revision Checklist
-Use this checklist to ensure you have mastered Docker's architecture:
-- [ ] Understand the Client-Server model and how the CLI talks to `dockerd`.
-- [ ] Understand the role of the Unix Socket (`/var/run/docker.sock`).
-- [ ] Can explain how Linux Namespaces (PID, NET, MNT, IPC, UTS, USER) provide process isolation.
-- [ ] Can explain how Control Groups (cgroups) protect host memory and CPU.
-- [ ] Know the difference between high-level runtime (`containerd`) and low-level runtime (`runc`).
-- [ ] Understand how OverlayFS layers stack together to create the container filesystem.
-- [ ] Understand why Docker Desktop requires a Linux VM on macOS.
-- [ ] Can explain how host port mapping (`-p 8081:80`) works via `iptables` and NAT.
-- [ ] Distinguish clearly between Docker Volumes, Bind Mounts, and tmpfs mounts.
-- [ ] Can execute multi-container batch stop and cleanup operations.
